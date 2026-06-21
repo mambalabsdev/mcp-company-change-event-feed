@@ -1,0 +1,44 @@
+{
+  "name": "@mambalabsdev/mcp-company-change-event-feed",
+  "version": "1.0.0",
+  "description": "MCP server for the Mamba Labs Company Change-Event Feed actor on Apify. Monitor a company domain for changes across hiring, tech stack, funding, firmographics, and social since the last run, returned as flat Clay-ready JSON change events.",
+  "type": "module",
+  "bin": {
+    "mcp-company-change-event-feed": "./build/index.js"
+  },
+  "scripts": {
+    "build": "tsc && chmod +x build/index.js",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "company-changes",
+    "change-detection",
+    "gtm-signals",
+    "buying-signals",
+    "sales-intelligence",
+    "delta-tracking",
+    "apify",
+    "clay"
+  ],
+  "author": "Mamba Labs <labs@mambamindsetgrowth.com>",
+  "license": "MIT",
+  "homepage": "https://apify.com/mambalabs",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mambalabsdev/mcp-company-change-event-feed"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "typescript": "^5.6.0"
+  },
+  "mcpName": "com.mambabuilt/mcp-company-change-event-feed"
+}

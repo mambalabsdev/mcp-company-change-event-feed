@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "mamba-company-change-event-feed": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@mambalabsdev/mcp-company-change-event-feed"
+      ],
+      "env": {
+        "APIFY_TOKEN": "your-apify-token"
+      }
+    }
+  }
+}
