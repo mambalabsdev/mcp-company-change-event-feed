@@ -4,6 +4,17 @@
 
 Company Change-Event Feed monitors a company domain for changes across hiring, tech stack, funding, firmographics, and social presence, then diffs the current state against your last run and returns only what changed as typed change events. Flat, Clay-ready JSON, one row per company, built for RevOps teams, outbound agencies, Clay users, and AI agents that need delta intelligence on target accounts.
 
+## What's Inside
+
+- [What it does](#what-it-does)
+- [Quick start](#quick-start)
+- [Prerequisites](#prerequisites)
+- [Example prompts](#example-prompts)
+- [Tool and inputs](#tool-and-inputs)
+- [Full actor documentation](#full-actor-documentation)
+- [Mamba Labs GTM Suite](#mamba-labs-gtm-suite)
+- [License](#license)
+
 ## What it does
 
 This server gives an AI client one tool:
