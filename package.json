@@ -1,6 +1,6 @@
 {
   "name": "@mambalabsdev/mcp-company-change-event-feed",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "MCP server for the Mamba Labs Company Change-Event Feed actor on Apify. Monitor a company domain for changes across hiring, tech stack, funding, firmographics, and social since the last run, returned as flat Clay-ready JSON change events.",
   "type": "module",
   "bin": {

@@ -118,9 +118,18 @@ server.registerTool(
         .string()
         .optional()
         .describe("Optional company name hint, used when the domain does not match the brand name, e.g. Deel for deel.com."),
+      previous_snapshot: z
+        .record(z.unknown())
+        .optional()
+        .describe("Snapshot object returned by a prior run. Supply it and it is used as the baseline instead of the stored snapshot, so you can hold delta state outside Apify and keep a scheduled run cheap."),
+      sub_actor_timeout_secs: z
+        .number()
+        .int()
+        .optional()
+        .describe("Per-child run timeout in seconds. Children run in parallel, so total wall time is about the slowest child. Lower it to keep a quick test run short. Default: 90."),
     },
   },
-  async ({ domain, company_name }) => {
+  async ({ domain, company_name, previous_snapshot, sub_actor_timeout_secs }) => {
     if (domain === undefined || domain.trim() === "") {
       return {
         isError: true,
@@ -130,7 +139,7 @@ server.registerTool(
     return runActor(
       "oX44rS0fkEJ3rXLWe",
       "Company Change-Event Feed",
-      compact({ domain, company_name }),
+      compact({ domain, company_name, previous_snapshot, sub_actor_timeout_secs }),
     );
   },
 );
