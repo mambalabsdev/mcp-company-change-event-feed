@@ -63,8 +63,10 @@ Get your token at https://console.apify.com/account/integrations, paste it in, a
 
 - `domain` (string, required): company domain to monitor, without https or www, e.g. stripe.com.
 - `company_name` (string, optional): company name hint, used when the domain does not match the brand name, e.g. Deel for deel.com.
+- `sources` (array, optional): which sources to monitor: `hiring`, `tech_stack`, `firmographic`, `funding`, `social`. Omit for all five. A source you do not select is not run and not charged, so this is the largest lever on cost.
+- `min_severity` (string, optional): `low` (default, everything), `medium` (drops small noise), `high` (funding, acquisitions, exec moves, CRM changes and large hiring ramps only).
 
-The output is one row per company: `company_domain`, `company_name`, `run_date`, `is_baseline`, `total_changes`, `has_high_severity`, `latest_change_date`, a `changes` array of typed change events, a `source_status` object (`ok` / `degraded` / `skipped` per source), and a `snapshot` object carrying the current state for the next run's comparison. Each change event has `event_type`, `severity`, `confidence`, `old_value`, `new_value`, and the `source_actor` immutable Actor ID.
+The output is one row per company: `company_domain`, `company_name`, `run_date`, `is_baseline`, `total_changes`, `has_high_severity`, `latest_change_date`, a `changes` array of typed change events, a `source_status` object (`ok` / `degraded` / `skipped` / `not_selected` per source), and a `snapshot` object carrying the current state for the next run's comparison. Each change event has `event_type`, `severity`, `confidence`, `old_value`, `new_value`, and the `source_actor` immutable Actor ID.
 
 Funding signals are coming soon: the funding source ships as `skipped` until its sub-actor goes live, after which funding, exec move, product launch, and acquisition events appear automatically.
 
