@@ -1,7 +1,7 @@
 {
   "manifest_version": "0.3",
   "name": "mcp-company-change-event-feed",
-  "version": "1.0.0",
+  "version": "1.2.0",
   "description": "MCP server that monitors a company domain for changes across hiring, tech stack, funding, firmographics, and social since the last run, returning only the deltas as typed change events in flat Clay-ready JSON.",
   "author": {
     "name": "Mamba Labs"
