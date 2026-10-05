@@ -30,37 +30,45 @@ function compact(obj: Record<string, unknown>): Record<string, unknown> {
   return out;
 }
 
+// How long this wrapper waits for a run, in milliseconds. The run itself keeps
+// the actor's own default timeout; past this wait the call returns the run id
+// and console link instead of an error that hides a run still billing.
+const WRAPPER_WAIT_MS = 30 * 60 * 1000;
+const POLL_INTERVAL_MS = Number(process.env.MAMBA_POLL_INTERVAL_MS) || 3000;
+
+const TERMINAL = new Set(["SUCCEEDED", "FAILED", "TIMED-OUT", "ABORTED", "ABORTING"]);
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
 // Shared caller. actorPath is the actor's immutable Apify actor ID (a stable key
 // that survives Store renames). The /v2/acts/{id} endpoint accepts it directly,
 // so a Store rename never breaks these calls.
+//
+// START AND POLL, NOT RUN-SYNC. Apify's synchronous endpoints carry a platform
+// ceiling of 300 seconds on the HTTP wait itself and answer 408 past it while
+// the run goes on and keeps billing. Starting the run, polling it to a terminal
+// status and then reading the dataset waits as long as the actor needs.
+//
+// The token is read here rather than at module load, so the tool registers
+// unconditionally and a server started without APIFY_TOKEN still advertises its
+// capabilities instead of reporting none.
 async function runActor(
   actorPath: string,
   actorLabel: string,
   input: Record<string, unknown>,
 ): Promise<ToolResult> {
+  const APIFY_TOKEN = process.env.APIFY_TOKEN;
   if (!APIFY_TOKEN) {
     return { isError: true, content: [{ type: "text", text: "APIFY_TOKEN is not set. Create a token at https://console.apify.com/account/integrations and set it as the APIFY_TOKEN environment variable." }] };
   }
 
-  const url = `https://api.apify.com/v2/acts/${actorPath}/run-sync-get-dataset-items?timeout=300`;
+  const headers = {
+    Authorization: `Bearer ${APIFY_TOKEN}`,
+    "Content-Type": "application/json",
+    "User-Agent": USER_AGENT,
+  };
 
-  let response: Response;
-  try {
-    response = await fetch(url, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${APIFY_TOKEN}`,
-        "Content-Type": "application/json",
-        "User-Agent": USER_AGENT,
-      },
-      body: JSON.stringify(input),
-    });
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    return { isError: true, content: [{ type: "text", text: `Could not reach the Apify API: ${message}` }] };
-  }
-
-  if (!response.ok) {
+  const httpError = async (response: Response): Promise<string> => {
     let detail = "";
     try {
       const body = (await response.json()) as { error?: { message?: string } };
@@ -68,26 +76,112 @@ async function runActor(
     } catch {
       detail = "";
     }
-
-    let message: string;
     switch (response.status) {
+      case 400:
+        return `The ${actorLabel} run was rejected as invalid input.${detail}`;
       case 401:
-        message = "Invalid Apify token. Check your APIFY_TOKEN environment variable.";
-        break;
+        return "Invalid Apify token. Check your APIFY_TOKEN environment variable.";
       case 402:
-        message =
-          "Insufficient Apify credits. Check your account balance at https://console.apify.com/billing";
-        break;
-      case 408:
-        message = `The ${actorLabel} run timed out after 300 seconds. Try again, or run the actor on Apify directly for longer jobs.`;
-        break;
+        return "Insufficient Apify credits. Check your account balance at https://console.apify.com/billing";
       default:
-        message = `Apify request to ${actorLabel} failed with status ${response.status}.${detail}`;
+        return `Apify request to ${actorLabel} failed with status ${response.status}.${detail}`;
     }
-    return { isError: true, content: [{ type: "text", text: message }] };
+  };
+
+  // 1. Start the run.
+  let started: Response;
+  try {
+    started = await fetch(
+      `https://api.apify.com/v2/acts/${actorPath}/runs`,
+      { method: "POST", headers, body: JSON.stringify(input) },
+    );
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return { isError: true, content: [{ type: "text", text: `Could not reach the Apify API: ${message}` }] };
+  }
+  if (!started.ok) {
+    return { isError: true, content: [{ type: "text", text: await httpError(started) }] };
   }
 
-  const items = await response.json();
+  let run: { id?: string; status?: string; defaultDatasetId?: string };
+  try {
+    run = ((await started.json()) as { data?: typeof run }).data ?? {};
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return { isError: true, content: [{ type: "text", text: `The ${actorLabel} run start returned a response that could not be parsed: ${message}` }] };
+  }
+  const runId = run.id;
+  if (!runId) {
+    return { isError: true, content: [{ type: "text", text: `The ${actorLabel} run start returned no run id, so there is nothing to wait for.` }] };
+  }
+
+  // 2. Poll to a terminal status.
+  const deadline = Date.now() + WRAPPER_WAIT_MS;
+  let status = run.status ?? "READY";
+  let datasetId = run.defaultDatasetId;
+  while (!TERMINAL.has(status)) {
+    if (Date.now() >= deadline) {
+      return {
+        isError: true,
+        content: [{ type: "text", text: `The ${actorLabel} run ${runId} was still ${status} after ${Math.round(WRAPPER_WAIT_MS / 1000)} seconds and this call stopped waiting. The run itself is still on Apify: read it at https://console.apify.com/actors/runs/${runId}` }],
+      };
+    }
+    await sleep(POLL_INTERVAL_MS);
+    let poll: Response;
+    try {
+      poll = await fetch(`https://api.apify.com/v2/actor-runs/${runId}`, { headers });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      return { isError: true, content: [{ type: "text", text: `Lost contact with the Apify API while waiting for ${actorLabel} run ${runId}: ${message}` }] };
+    }
+    if (!poll.ok) {
+      return { isError: true, content: [{ type: "text", text: await httpError(poll) }] };
+    }
+    const body = (await poll.json()) as { data?: { status?: string; defaultDatasetId?: string } };
+    status = body.data?.status ?? status;
+    datasetId = body.data?.defaultDatasetId ?? datasetId;
+  }
+
+  // 3. A run that did not succeed is a failure the caller must see, never an
+  // empty success, so a crashed run never reads as "no results found".
+  if (status !== "SUCCEEDED") {
+    return {
+      isError: true,
+      content: [{ type: "text", text: `The ${actorLabel} run did not succeed (run ID: ${runId}, status: ${status}).` }],
+    };
+  }
+  if (!datasetId) {
+    return { isError: true, content: [{ type: "text", text: `The ${actorLabel} run ${runId} succeeded but reported no dataset, so there is nothing to return.` }] };
+  }
+
+  // 4. Read the dataset.
+  let ds: Response;
+  try {
+    ds = await fetch(`https://api.apify.com/v2/datasets/${datasetId}/items?format=json`, { headers });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return { isError: true, content: [{ type: "text", text: `Could not read the ${actorLabel} dataset: ${message}` }] };
+  }
+  if (!ds.ok) {
+    return { isError: true, content: [{ type: "text", text: await httpError(ds) }] };
+  }
+
+  let items: unknown;
+  try {
+    items = await ds.json();
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return { isError: true, content: [{ type: "text", text: `The ${actorLabel} run returned a response that could not be parsed: ${message}` }] };
+  }
+
+  if (!Array.isArray(items)) {
+    const asObj = items as { error?: { type?: string; message?: string } };
+    const detail = asObj?.error?.message
+      ? `${asObj.error.message}`
+      : JSON.stringify(items);
+    return { isError: true, content: [{ type: "text", text: `The ${actorLabel} run did not return a dataset. ${detail}` }] };
+  }
+
   return { content: [{ type: "text", text: JSON.stringify(items, null, 2) }] };
 }
 
@@ -102,7 +196,7 @@ server.registerTool(
   {
     title: "Get Company Changes",
     description:
-      "Monitor a company domain for changes across hiring, tech stack, funding, firmographics, and social since the last run. Returns only what changed as typed change events in flat, Clay-ready JSON. Read-only; requires APIFY_TOKEN; consumes Apify credits.",
+      "Monitor a company domain for changes across hiring, tech stack, funding, firmographics, and social since the last run. The first run for a domain records a baseline and reports no changes (is_baseline true); every later run diffs against the stored snapshot, or against previous_snapshot when you pass one, and returns only what changed as typed change events, each with severity, confidence, old and new value, and the source actor ID. One flat Clay-ready row per company, with source_status per source and a snapshot object for the next comparison. Use it on a schedule to watch target accounts for deltas. Do not use it for a one-time profile of a company (the Company Firmographic Enricher or a single source actor is cheaper), because each selected source is one sub actor run. Pass domains for a batch. Requires an APIFY_TOKEN and consumes Apify credits per source run. Read only.",
     annotations: {
       title: "Get Company Changes",
       readOnlyHint: true,
@@ -113,7 +207,12 @@ server.registerTool(
     inputSchema: {
       domain: z
         .string()
-        .describe("Company domain to monitor, without https or www, e.g. stripe.com."),
+        .optional()
+        .describe("Company domain to monitor, without https or www, e.g. stripe.com. Required unless domains is set."),
+      domains: z
+        .array(z.string())
+        .optional()
+        .describe("Batch mode: several company domains in one run, one output row each. When set and non-empty it overrides domain. previous_snapshot is ignored in batch mode."),
       company_name: z
         .string()
         .optional()
@@ -133,21 +232,27 @@ server.registerTool(
       sub_actor_timeout_secs: z
         .number()
         .int()
+        .min(5)
+        .max(300)
         .optional()
-        .describe("Per-child run timeout in seconds. Children run in parallel, so total wall time is about the slowest child. Lower it to keep a quick test run short. Default: 90."),
+        .describe("Per-child run timeout in seconds, 5 to 300. Children run in parallel, so total wall time is about the slowest child. Lower it to keep a quick test run short. Default: 90."),
     },
   },
-  async ({ domain, company_name, sources, min_severity, previous_snapshot, sub_actor_timeout_secs }) => {
-    if (domain === undefined || domain.trim() === "") {
+  async ({ domain, domains, company_name, sources, min_severity, previous_snapshot, sub_actor_timeout_secs }) => {
+    const batch = Array.isArray(domains) ? domains.filter((d) => d.trim() !== "") : [];
+    if ((domain === undefined || domain.trim() === "") && batch.length === 0) {
       return {
         isError: true,
-        content: [{ type: "text", text: "Provide a company domain, e.g. stripe.com." }],
+        content: [{ type: "text", text: "Provide a company domain, e.g. stripe.com, or a domains array." }],
       };
     }
+    // The actor schema marks domain required even in batch mode, so a batch
+    // call without one sends the first batch domain there; domains overrides it.
+    if ((domain === undefined || domain.trim() === "") && batch.length > 0) domain = batch[0];
     return runActor(
       "oX44rS0fkEJ3rXLWe",
       "Company Change-Event Feed",
-      compact({ domain, company_name, sources, min_severity, previous_snapshot, sub_actor_timeout_secs }),
+      compact({ domain, domains: batch.length > 0 ? batch : undefined, company_name, sources, min_severity, previous_snapshot, sub_actor_timeout_secs }),
     );
   },
 );
