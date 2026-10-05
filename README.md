@@ -61,14 +61,21 @@ Get your token at https://console.apify.com/account/integrations, paste it in, a
 
 `get_company_changes`:
 
-- `domain` (string, required): company domain to monitor, without https or www, e.g. stripe.com.
+- `domain` (string, required unless `domains` is set): company domain to monitor, without https or www, e.g. stripe.com.
+- `domains` (array, optional): batch mode, several company domains in one run with one output row each. When set and non-empty it overrides `domain`.
 - `company_name` (string, optional): company name hint, used when the domain does not match the brand name, e.g. Deel for deel.com.
 - `sources` (array, optional): which sources to monitor: `hiring`, `tech_stack`, `firmographic`, `funding`, `social`. Omit for all five. A source you do not select is not run and not charged, so this is the largest lever on cost.
 - `min_severity` (string, optional): `low` (default, everything), `medium` (drops small noise), `high` (funding, acquisitions, exec moves, CRM changes and large hiring ramps only).
+- `previous_snapshot` (object, optional): the `snapshot` object returned by a prior run. Supply it and it is used as the baseline instead of the stored snapshot, so you can hold delta state outside Apify. Ignored in batch mode.
+- `sub_actor_timeout_secs` (integer, optional): per source run timeout in seconds, 5 to 300, default 90. The sources run in parallel, so total wall time is about the slowest source. Lower it to keep a quick test short.
+
+`sources` and `sub_actor_timeout_secs` are the two controls on how long and how much a call costs: each selected source is one sub actor run.
 
 The output is one row per company: `company_domain`, `company_name`, `run_date`, `is_baseline`, `total_changes`, `has_high_severity`, `latest_change_date`, a `changes` array of typed change events, a `source_status` object (`ok` / `degraded` / `skipped` / `not_selected` per source), and a `snapshot` object carrying the current state for the next run's comparison. Each change event has `event_type`, `severity`, `confidence`, `old_value`, `new_value`, and the `source_actor` immutable Actor ID.
 
-Funding signals are coming soon: the funding source ships as `skipped` until its sub-actor goes live, after which funding, exec move, product launch, and acquisition events appear automatically.
+The funding source runs the Funding and Press Signal Scanner, so funding, exec move, product launch, and acquisition events are reported like any other source.
+
+The tool starts the actor run and polls it to a finished status, so a long run is not cut off at 300 seconds. If the run is still going after 30 minutes, the call stops waiting and returns the run ID with a link to it in the Apify Console, where the results land when it finishes. A run that does not succeed comes back as an error with its run ID and status.
 
 ## Full actor documentation
 
@@ -80,7 +87,7 @@ https://apify.com/mambalabs/company-change-event-feed
 
 ## Mamba Labs GTM Suite
 
-This server is part of the **Mamba Labs GTM Suite**, a fleet of twelve specialized MCP servers for go-to-market signal intelligence, each backed by a dedicated Apify actor.
+This server is part of the **Mamba Labs GTM Suite**, a fleet of 54 MCP servers for go-to-market data, each backed by a dedicated Apify actor. The table lists the actors the suite started with; every server is listed at https://mambabuilt.com.
 
 | Actor | Immutable Actor ID |
 |---|---|
