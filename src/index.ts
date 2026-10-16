@@ -242,7 +242,7 @@ server.registerTool(
         .min(5)
         .max(300)
         .optional()
-        .describe("Per-child run timeout in seconds, 5 to 300. Children run in parallel, so total wall time is about the slowest child. Lower it to keep a quick test run short. Default: 90."),
+        .describe("Per-child run timeout in seconds, 5 to 300. Children run in parallel, so total wall time is about the slowest child. Lower it to keep a quick test run short. Default: 300."),
     },
   },
   async ({ domain, domains, company_name, sources, min_severity, previous_snapshot, sub_actor_timeout_secs, max_charge_usd }) => {

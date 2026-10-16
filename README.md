@@ -67,7 +67,7 @@ Get your token at https://console.apify.com/account/integrations, paste it in, a
 - `sources` (array, optional): which sources to monitor: `hiring`, `tech_stack`, `firmographic`, `funding`, `social`. Omit for all five. A source you do not select is not run and not charged, so this is the largest lever on cost.
 - `min_severity` (string, optional): `low` (default, everything), `medium` (drops small noise), `high` (funding, acquisitions, exec moves, CRM changes and large hiring ramps only).
 - `previous_snapshot` (object, optional): the `snapshot` object returned by a prior run. Supply it and it is used as the baseline instead of the stored snapshot, so you can hold delta state outside Apify. Ignored in batch mode.
-- `sub_actor_timeout_secs` (integer, optional): per source run timeout in seconds, 5 to 300, default 90. The sources run in parallel, so total wall time is about the slowest source. Lower it to keep a quick test short.
+- `sub_actor_timeout_secs` (integer, optional): per source run timeout in seconds, 5 to 300, default 300. The sources run in parallel, so total wall time is about the slowest source. Lower it to keep a quick test short.
 - `max_charge_usd` (optional): a cost cap in USD for this run. The actor stops before an item that could take its charges past this amount. Omit it to rely on the maximum cost per run set in Apify.
 
 `sources` and `sub_actor_timeout_secs` are the two controls on how long and how much a call costs: each selected source is one sub actor run.
