@@ -14,9 +14,9 @@ const TOOL_NAME = "get_company_changes";
 const ACTOR_ID = "oX44rS0fkEJ3rXLWe";
 // Every input the live actor exposes to a buyer must be exposed by the tool.
 // Excluded by rule: source_tag (internal or test only fields).
-const ACTOR_INPUTS = ["company_name","domain","domains","min_severity","previous_snapshot","sources","sub_actor_timeout_secs"];
+const ACTOR_INPUTS = ["max_charge_usd","company_name","domain","domains","min_severity","previous_snapshot","sources","sub_actor_timeout_secs"];
 // The tool's full input list, so a dropped or renamed parameter fails here.
-const TOOL_INPUTS = ["company_name","domain","domains","min_severity","previous_snapshot","sources","sub_actor_timeout_secs"];
+const TOOL_INPUTS = ["max_charge_usd","company_name","domain","domains","min_severity","previous_snapshot","sources","sub_actor_timeout_secs"];
 const TOOL_REQUIRED = [];
 const SAMPLE_ARGS = {"domain":"stripe.com"};
 const RUN_QUERY = "?timeout=1800";

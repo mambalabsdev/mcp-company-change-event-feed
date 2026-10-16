@@ -68,6 +68,7 @@ Get your token at https://console.apify.com/account/integrations, paste it in, a
 - `min_severity` (string, optional): `low` (default, everything), `medium` (drops small noise), `high` (funding, acquisitions, exec moves, CRM changes and large hiring ramps only).
 - `previous_snapshot` (object, optional): the `snapshot` object returned by a prior run. Supply it and it is used as the baseline instead of the stored snapshot, so you can hold delta state outside Apify. Ignored in batch mode.
 - `sub_actor_timeout_secs` (integer, optional): per source run timeout in seconds, 5 to 300, default 90. The sources run in parallel, so total wall time is about the slowest source. Lower it to keep a quick test short.
+- `max_charge_usd` (optional): a cost cap in USD for this run. The actor stops before an item that could take its charges past this amount. Omit it to rely on the maximum cost per run set in Apify.
 
 `sources` and `sub_actor_timeout_secs` are the two controls on how long and how much a call costs: each selected source is one sub actor run.
 
@@ -76,6 +77,16 @@ The output is one row per company: `company_domain`, `company_name`, `run_date`,
 The funding source runs the Funding and Press Signal Scanner, so funding, exec move, product launch, and acquisition events are reported like any other source.
 
 The tool starts the actor run and polls it to a finished status, so a long run is not cut off at 300 seconds. The run is allowed 1,800 seconds. If it is still going two minutes after that, the call stops waiting and returns the run ID with a link to it in the Apify Console, where the results land when it finishes. A run that does not succeed comes back as an error with its run ID and status.
+
+## Pricing
+
+Price per event on the Apify FREE plan, from the live pricing record; paid Apify plans pay less per event.
+
+| Event | Price (USD) |
+| --- | --- |
+| Actor Start (`apify-actor-start`) | 0.00005 |
+| result (`apify-default-dataset-item`) | 0.01 |
+| change source resolved (`change-source-resolved`) | 0.01 |
 
 ## Full actor documentation
 
@@ -87,7 +98,7 @@ https://apify.com/mambalabs/company-change-event-feed
 
 ## Mamba Labs GTM Suite
 
-This server is part of the **Mamba Labs GTM Suite**, a fleet of 54 MCP servers for go-to-market data, each backed by a dedicated Apify actor. The table lists the actors the suite started with; every server is listed at https://mambabuilt.com.
+This server is part of the **Mamba Labs GTM Suite**, a fleet of 58 MCP servers for go-to-market data, each backed by a dedicated Apify actor. The table lists the actors the suite started with; every server is listed at https://mambabuilt.com.
 
 | Actor | Immutable Actor ID |
 |---|---|
