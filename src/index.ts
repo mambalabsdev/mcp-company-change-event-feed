@@ -202,15 +202,16 @@ server.registerTool(
   {
     title: "Get Company Changes",
     description:
-      "Monitor a company domain for changes across hiring, tech stack, funding, firmographics, and social since the last run. The first run for a domain records a baseline and reports no changes (is_baseline true); every later run diffs against the stored snapshot, or against previous_snapshot when you pass one, and returns only what changed as typed change events, each with severity, confidence, old and new value, and the source actor ID. One flat Clay-ready row per company, with source_status per source and a snapshot object for the next comparison. Use it on a schedule to watch target accounts for deltas. Do not use it for a one-time profile of a company (the Company Firmographic Enricher or a single source actor is cheaper), because each selected source is one sub actor run. Pass domains for a batch. Requires an APIFY_TOKEN and consumes Apify credits per source run. Read only.",
+      "Monitor a company domain for changes across hiring, tech stack, funding, firmographics, and social since the last run. The first run for a domain records a baseline and reports no changes (is_baseline true); every later run diffs against the stored snapshot, or against previous_snapshot when you pass one, and returns only what changed as typed change events, each with severity, confidence, old and new value, and the source actor ID. One flat Clay-ready row per company, with source_status per source and a snapshot object for the next comparison. Use it on a schedule to watch target accounts for deltas. Do not use it for a one-time profile of a company (the Company Firmographic Enricher or a single source actor is cheaper), because each selected source is one sub actor run. Pass domains for a batch. Requires an APIFY_TOKEN and consumes Apify credits per source run. Reads public data only and writes nothing.",
     annotations: {
       title: "Get Company Changes",
-      readOnlyHint: true,
+      readOnlyHint: false,
       destructiveHint: false,
       idempotentHint: false,
       openWorldHint: true,
     },
     inputSchema: {
+      max_charge_usd: z.number().min(0).optional().describe("Optional. The run stops before any charge that would take this run's total past this amount in USD, and every row already charged is kept. Leave it empty to rely only on the maximum cost per run set in Apify, which the actor also honors."),
       domain: z
         .string()
         .optional()
@@ -244,7 +245,7 @@ server.registerTool(
         .describe("Per-child run timeout in seconds, 5 to 300. Children run in parallel, so total wall time is about the slowest child. Lower it to keep a quick test run short. Default: 90."),
     },
   },
-  async ({ domain, domains, company_name, sources, min_severity, previous_snapshot, sub_actor_timeout_secs }) => {
+  async ({ domain, domains, company_name, sources, min_severity, previous_snapshot, sub_actor_timeout_secs, max_charge_usd }) => {
     const batch = Array.isArray(domains) ? domains.filter((d) => d.trim() !== "") : [];
     if ((domain === undefined || domain.trim() === "") && batch.length === 0) {
       return {
@@ -258,7 +259,7 @@ server.registerTool(
     return runActor(
       "oX44rS0fkEJ3rXLWe",
       "Company Change-Event Feed",
-      compact({ domain, domains: batch.length > 0 ? batch : undefined, company_name, sources, min_severity, previous_snapshot, sub_actor_timeout_secs }),
+      compact({ max_charge_usd, domain, domains: batch.length > 0 ? batch : undefined, company_name, sources, min_severity, previous_snapshot, sub_actor_timeout_secs }),
     );
   },
 );
